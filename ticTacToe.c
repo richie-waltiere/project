@@ -11,6 +11,7 @@
 #define RED "\033[1;31m"
 #define GREEN "\033[1;32m"
 #define YELLOW "\033[1;33m"
+#define PURPLE "\033[1;35m"
 #define CYAN "\033[1;36m"
 #define ROWS  3 
 #define COLS 3
@@ -18,6 +19,8 @@
 #define COLORED_STRING_SIZE 16
 #define PLAYER_1 "Player 1"
 #define PLAYER_2 "Player 2"
+#define QUIT 0
+#define KEEP_PLAYING 1
 
 
 typedef struct {
@@ -83,6 +86,17 @@ void resetBoard(char board[][COLS], int row_size) {
   }
 }
 
+void resetPosition(Position *p) {
+  p->row0 = 0;
+  p->row1 = 0;
+  p->row2 = 0;
+  p->col0 = 0;
+  p->col1 = 0;
+  p->col2 = 0;
+  p->diagDownRight = 0;
+  p->diagUpRight = 0;
+}
+
 void clearInputBuffer() {
   int c;
   while ((c = getchar()) != '\n' && c != EOF) {
@@ -110,7 +124,6 @@ int getPlayerChoice(char player_name[9]) {
     printf("Invalid player name.");
     return -1;
   }
-  int player1Choice = 0;
   char choice[3];
   readLine(choice, 3);
   printf("\n");
@@ -177,14 +190,25 @@ void printWinningMessage(char winning_player[9]) {
          RESET);
 }
 
+int keepPlaying() {
+  char yes_or_no[2];
+  printf(GREEN "Play again? " RESET "Enter Y or y for another game: ");
+  readLine(yes_or_no, 2);
+  printf("\n");
+  if (yes_or_no[0] == 'y' || yes_or_no[0] == 'Y') return KEEP_PLAYING;
+  printf(PURPLE "Thanks for playing!!!\n\n" RESET);
+  return QUIT;
+
+}
+
 int updateBoard(char player_name[9], char board[][COLS], Position *p) {
   while (1) {
     int playerChoice = getPlayerChoice(player_name);
     if (playerChoice == -1) {
       printf("Invalid selection. Enter a number from 1-9.\n\n");
     } else if (playerChoice == INT_MIN){
-      printf(GREEN "Thanks for playing!!!\n\n" RESET);
-      return 0; // End of game.
+      printf(PURPLE "Thanks for playing!!!\n\n" RESET);
+      return QUIT; // End of game.
     } else {
       int row = (playerChoice - 1) / 3;
       int col = (playerChoice - 1) % 3;
@@ -238,31 +262,57 @@ int updateBoard(char player_name[9], char board[][COLS], Position *p) {
       }
     }
   }
-  return 1; // Continue playing.
+  return KEEP_PLAYING; // Continue playing.
+}
+
+void reset(char board[][COLS], int row_size, Position *p) {
+  resetBoard(board, row_size); // Reset board display.
+  resetPosition(p); // Reset row/col/diag count.
+  // Reset board array.
+  for (int i = 0; i < row_size; i++) {
+    int row = (i - 1) / 3;
+    int col = ( - 1) % 3;
+    char current_digit = (char)(i + '1'); 
+    board[row][col] = current_digit;
+    current_digit = (char)(current_digit + 1); // Next digit.
+  }
 }
 
 int main(void) {
   char board[ROWS][COLS] = {{'1','2','3'},{'4','5','6'},{'7','8','9'}};
   printInstructions();
-  resetBoard(board, ROWS);
-  printBoard(board, ROWS);
   Position positions = {0, 0, 0, 0, 0, 0, 0, 0};
   Position *p = &positions;
-  int keep_playing = 1;
+  printBoard(board, ROWS);
+  int keep_playing = KEEP_PLAYING;
+  int count = 0;
   //printf("%d\n", getPlayerChoice(PLAYER_1));
   //printf("%d\n", getPlayerChoice(PLAYER_2));
   while(1) {
     keep_playing = updateBoard(PLAYER_1, board, p);
-    if (!keep_playing) return 0;
-    if (isWinner(p)) {
-      printWinningMessage(PLAYER_1);
-      return 0;
+    if (!keep_playing) return QUIT;
+    count++;
+    if (count == 9 || isWinner(p)) {
+      if (isWinner(p)) {
+        printWinningMessage(PLAYER_1);
+      } else if (count == 9) {
+        printf(PURPLE "It's a tie!!!\n\n" RESET);
+      }
+      if (keepPlaying() == QUIT) return QUIT;
+      count = 0;
+      reset(board, ROWS, p);
+      printBoard(board, ROWS);
+      continue;
     }
     keep_playing = updateBoard(PLAYER_2, board, p);
-    if (!keep_playing) return 0;
+    if (!keep_playing) return QUIT;
+    count++;
     if (isWinner(p)) {
       printWinningMessage(PLAYER_2);
-      return 0;
+      if (keepPlaying() == QUIT) return QUIT;
+      count = 0;
+      reset(board, ROWS, p);
+      printBoard(board, ROWS);
     }
   }
 }

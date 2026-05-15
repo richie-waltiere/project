@@ -4,8 +4,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <limits.h>
+#include <stdbool.h>
 //#include <math.h>
-//#include <stdbool.h>
 //#include <float.h>
 #define RESET "\033[0m"
 #define RED "\033[1;31m"
@@ -16,8 +16,15 @@
 #define COLS 3
 #define NUM_BOARD_POSITIONS 9
 #define COLORED_STRING_SIZE 16
-#define PLAYER_1 "Player 1: "
-#define PLAYER_2 "Player 2: "
+#define PLAYER_1 "Player 1"
+#define PLAYER_2 "Player 2"
+
+
+typedef struct {
+  int row0, row1, row2;
+  int col0, col1, col2;
+  int diagDownRight, diagUpRight;  
+} Position;
 
 // Colors the characters on the board.
 // The colored board uses an array of strings to allow for ANSI colors.
@@ -94,11 +101,11 @@ void readLine(char *ptr, int scan_size) {
 
 // Return position choice. Return -1 if choice is invalid.
 // Use PLAYER_1 or PLAYER_2 constants as input.
-int getPlayerChoice(char player_name[11]) {
+int getPlayerChoice(char player_name[9]) {
   if (player_name == PLAYER_1){
-    printf(CYAN "%s" RESET, player_name);
+    printf(CYAN "%s: " RESET, player_name);
   } else if (player_name == PLAYER_2) {
-    printf(RED "%s" RESET, player_name);
+    printf(RED "%s: " RESET, player_name);
   } else {
     printf("Invalid player name.");
     return -1;
@@ -142,8 +149,96 @@ void printInstructions(void) {
        );
 }
 
-void printWinningMessage(char winningPlayer[9]) {
-  printf("Congratulations %s, you won the game!!!\n\n", winningPlayer);
+bool isWinner(Position *p) {
+  // Player 1 wins.
+  if (p->row0 == 3 || p->row1 == 3 || p->row2 == 3 ||
+      p->col0 == 3 || p->col1 == 3 || p->col2 == 3 ||
+      p->diagDownRight == 3 || p->diagUpRight == 3) {
+    return true;
+  }
+
+  // Player 2 wins.
+  if (p->row0 == -3 || p->row1 == -3 || p->row2 == -3 ||
+      p->col0 == -3 || p->col1 == -3 || p->col2 == -3 ||
+      p->diagDownRight == -3 || p->diagUpRight == -3) {
+    return true;
+  }
+
+  // No winner yet.
+  return false;
+
+}
+
+void printWinningMessage(char winning_player[9]) {
+  char *color = (winning_player == PLAYER_1) ? CYAN : RED;
+  printf("Congratulations %s%s%s, you won the game!!!\n\n", 
+         color,
+         winning_player,
+         RESET);
+}
+
+int updateBoard(char player_name[9], char board[][COLS], Position *p) {
+  while (1) {
+    int playerChoice = getPlayerChoice(player_name);
+    if (playerChoice == -1) {
+      printf("Invalid selection. Enter a number from 1-9.\n\n");
+    } else if (playerChoice == INT_MIN){
+      printf(GREEN "Thanks for playing!!!\n\n" RESET);
+      return 0; // End of game.
+    } else {
+      int row = (playerChoice - 1) / 3;
+      int col = (playerChoice - 1) % 3;
+      char position = board[row][col];
+      if (position == 'X' || position == 'O') {
+        printf("Position already taken by %c.\n\n", position);
+      }
+      else {
+        switch (row) {
+          case 0:
+            (player_name == PLAYER_1) ? (p->row0)++ : (p->row0)--;
+            break;
+          case 1:
+            (player_name == PLAYER_1) ? (p->row1)++ : (p->row1)--;
+            break;
+          case 2:
+            (player_name == PLAYER_1) ? (p->row2)++ : (p->row2)--;
+            break;
+        }
+        //printf("row 0: %d row 1: %d row 2: %d\n", row0, row1, row2);
+        switch (col) {
+          case 0:
+            (player_name == PLAYER_1) ? (p->col0)++ : (p->col0)--;
+            break;
+          case 1:
+            (player_name == PLAYER_1) ? (p->col1)++ : (p->col1)--;
+            break;
+          case 2:
+            (player_name == PLAYER_1) ? (p->col2)++ : (p->col2)--;
+            break;
+        }
+        //printf("col 0: %d col 1: %d col 2: %d\n", col0, col1, col2);
+        if (row == col) {
+          (player_name==PLAYER_1) ? (p->diagDownRight)++ : (p->diagDownRight)--;
+          if (row == 1) { // Middle position in both diagonals.
+            if (player_name == PLAYER_1) {
+              (p->diagUpRight)++;
+            } else {
+              (p->diagUpRight)--;
+
+            }
+          }
+        }
+        if (abs(row - col) == 2) {
+          (player_name==PLAYER_1) ? (p->diagUpRight)++ : (p->diagUpRight)--;
+        }        
+        //printf("diagDownRight: %d diagUpRight: %d\n", diagDownRight, diagUpRight);
+        board[row][col] = (player_name == PLAYER_1) ? 'X' : 'O';
+        printBoard(board, ROWS);
+        break;
+      }
+    }
+  }
+  return 1; // Continue playing.
 }
 
 int main(void) {
@@ -151,128 +246,23 @@ int main(void) {
   printInstructions();
   resetBoard(board, ROWS);
   printBoard(board, ROWS);
-  int row0 = 0, row1 = 0, row2 = 0;
-  int col0 = 0, col1 = 0, col2 = 0;
-  int diagDownRight = 0, diagUpRight = 0;  
+  Position positions = {0, 0, 0, 0, 0, 0, 0, 0};
+  Position *p = &positions;
+  int keep_playing = 1;
   //printf("%d\n", getPlayerChoice(PLAYER_1));
   //printf("%d\n", getPlayerChoice(PLAYER_2));
   while(1) {
-    while (1) {
-      int player1Choice = getPlayerChoice(PLAYER_1);
-      if (player1Choice == -1) {
-        printf("Invalid selection. Enter a number from 1-9.\n\n");
-      } else if (player1Choice == INT_MIN){
-        printf(GREEN "Thanks for playing!!!\n\n" RESET);
-        return 0;
-      } else {
-        char position = board[(player1Choice - 1) / 3][(player1Choice - 1) % 3];
-        if (position == 'X' || position == 'O') {
-          printf("Position already taken by %c.\n\n", position);
-        }
-        else {
-          int row = (player1Choice - 1) / 3;
-          int col = (player1Choice - 1) % 3;
-          switch (row) {
-            case 0:
-              row0++;
-              break;
-            case 1:
-              row1++;
-              break;
-            case 2:
-              row2++;
-              break;
-          }
-          //printf("row 0: %d row 1: %d row 2: %d\n", row0, row1, row2);
-          switch (col) {
-            case 0:
-              col0++;
-              break;
-            case 1:
-              col1++;
-              break;
-            case 2:
-              col2++;
-              break;
-          }
-          //printf("col 0: %d col 1: %d col 2: %d\n", col0, col1, col2);
-          if (row == col) {
-            diagDownRight++;
-            if (row == 1) diagUpRight++; // Middle position in both diagonals.
-          }
-          if (abs(row - col) == 2) diagUpRight++;
-          //printf("diagDownRight: %d diagUpRight: %d\n", diagDownRight, diagUpRight);
-          board[row][col] = 'X';
-          printBoard(board, ROWS);
-          if (row0 == 3 || row1 == 3 || row2 == 3 ||
-              col0 == 3 || col1 == 3 || col2 == 3 ||
-              diagDownRight == 3 || diagUpRight == 3) {
-            printWinningMessage("Player 1");
-            return 0;
-          }
-          break;
-        }
-      }
+    keep_playing = updateBoard(PLAYER_1, board, p);
+    if (!keep_playing) return 0;
+    if (isWinner(p)) {
+      printWinningMessage(PLAYER_1);
+      return 0;
     }
-    while (1) {
-      int player2Choice = getPlayerChoice(PLAYER_2);
-      if (player2Choice == -1) {
-        printf("Invalid selection. Enter a number from 1-9.\n\n");
-      } else if (player2Choice == INT_MIN){
-        printf(GREEN "Thanks for playing!!!\n\n" RESET);
-        return 0;
-      } else {
-        char position = board[(player2Choice - 1) / 3][(player2Choice - 1) % 3];
-        if (position == 'X' || position == 'O') {
-          printf("Position already taken by %c.\n\n", position);
-        }
-        else {
-          // check if in row; add 1 if in row if X; add -1 if O; 
-          // declare winner if needed, but only after modifying board.
-          int row = (player2Choice - 1) / 3;
-          int col = (player2Choice - 1) % 3;
-          switch (row) {
-            case 0:
-              row0--;
-              break;
-            case 1:
-              row1--;
-              break;
-            case 2:
-              row2--;
-              break;
-          }
-          //printf("row 0: %d row 1: %d row 2: %d\n", row0, row1, row2);
-          switch (col) {
-            case 0:
-              col0--;
-              break;
-            case 1:
-              col1--;
-              break;
-            case 2:
-              col2--;
-              break;
-          }
-          //printf("col 0: %d col 1: %d col 2: %d\n", col0, col1, col2);
-          if (row == col) {
-            diagDownRight--;
-            if (row == 1) diagUpRight--; // Middle position in both diagonals.
-          }
-          if (abs(row - col) == 2) diagUpRight--;
-          //printf("diagDownRight: %d diagUpRight: %d\n", diagDownRight, diagUpRight);
-          board[row][col] = 'O';
-          printBoard(board, ROWS);
-          if (row0 == -3 || row1 == -3 || row2 == -3 ||
-              col0 == -3 || col1 == -3 || col2 == -3 ||
-              diagDownRight == -3 || diagUpRight == -3) {
-            printWinningMessage("Player 2");
-            return 0;
-          }
-          break;
-        }
-      }
+    keep_playing = updateBoard(PLAYER_2, board, p);
+    if (!keep_playing) return 0;
+    if (isWinner(p)) {
+      printWinningMessage(PLAYER_2);
+      return 0;
     }
   }
-  return 0;
 }

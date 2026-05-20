@@ -24,9 +24,10 @@
 
 
 typedef struct {
-  int row0, row1, row2;
-  int col0, col1, col2;
-  int diagDownRight, diagUpRight;  
+  int row[3];
+  int col[3];
+  int diag_down_right;  
+  int diag_up_right;  
 } ThreesCount;
 
 // Colors the characters on the board.
@@ -91,14 +92,13 @@ void resetBoard(char board[][COLS], int row_size) {
 // X's count as +1, O's count as -1.
 // If any row/column/diagonal score reaches 3 or -3, the game is over.
 void resetThreesCount(ThreesCount *ptr_rcd) {
-  ptr_rcd->row0 = 0;
-  ptr_rcd->row1 = 0;
-  ptr_rcd->row2 = 0;
-  ptr_rcd->col0 = 0;
-  ptr_rcd->col1 = 0;
-  ptr_rcd->col2 = 0;
-  ptr_rcd->diagDownRight = 0;
-  ptr_rcd->diagUpRight = 0;
+  for (int i = 0; i < 3; i++) {
+    ptr_rcd->row[i] = 0;
+    ptr_rcd->col[i] = 0;
+
+  }
+  ptr_rcd->diag_down_right = 0;
+  ptr_rcd->diag_up_right = 0;
 }
 
 void clearInputBuffer() {
@@ -170,18 +170,18 @@ void printInstructions(void) {
 // Returns true if the game has been won, false otherwise.
 bool isWinner(ThreesCount *ptr_rcd) {
   // Player 1 wins.
-  if (ptr_rcd->row0 == 3 || ptr_rcd->row1 == 3 || ptr_rcd->row2 == 3 ||
-      ptr_rcd->col0 == 3 || ptr_rcd->col1 == 3 || ptr_rcd->col2 == 3 ||
-      ptr_rcd->diagDownRight == 3 || ptr_rcd->diagUpRight == 3) {
-    return true;
+  for (int i = 0; i < 3; i++) { // Win on row or column.
+    if (ptr_rcd->row[i] == 3 || ptr_rcd->col[i] == 3) return true;
   }
+  // Win on diagonal.
+  if (ptr_rcd->diag_down_right == 3 || ptr_rcd->diag_up_right == 3) return true;
 
   // Player 2 wins.
-  if (ptr_rcd->row0 == -3 || ptr_rcd->row1 == -3 || ptr_rcd->row2 == -3 ||
-      ptr_rcd->col0 == -3 || ptr_rcd->col1 == -3 || ptr_rcd->col2 == -3 ||
-      ptr_rcd->diagDownRight == -3 || ptr_rcd->diagUpRight == -3) {
-    return true;
+  for (int i = 0; i < 3; i++) { // Win on row or column.
+    if (ptr_rcd->row[i] == -3 || ptr_rcd->col[i] == -3) return true;
   }
+  // Win on diagonal.
+  if (ptr_rcd->diag_down_right == -3 || ptr_rcd->diag_up_right==-3) return true;
 
   // No winner yet.
   return false;
@@ -214,7 +214,7 @@ int keepPlaying() {
 // Update includes: getting player input, updating board array, 
 // reprinting board,and updating row/col/diag counts.
 // Returns INT_MIN if player enters q or Q. Returns 1 otherwise.
-int updateBoard(char player_name[9], char board[][COLS], ThreesCount *ptr_rcd) {
+int updateBoard(char *player_name, char board[][COLS], ThreesCount *ptr_rcd) {
   while (1) {
     int playerChoice = getPlayerChoice(player_name);
     if (playerChoice == -1) {
@@ -223,60 +223,33 @@ int updateBoard(char player_name[9], char board[][COLS], ThreesCount *ptr_rcd) {
       printf(PURPLE "Thanks for playing!!!\n\n" RESET);
       return QUIT; // End of game.
     } else {
-      int row = (playerChoice - 1) / 3;
-      int col = (playerChoice - 1) % 3;
-      char position = board[row][col];
+      int row_i = (playerChoice - 1) / 3;
+      int col_j = (playerChoice - 1) % 3;
+      char position = board[row_i][col_j];
+      // Increment count if Player_1 choice, decrement if PLAYER_2 choice.
+      int delta = (strcmp(player_name, PLAYER_1)) == 0 ? 1 : -1; 
       if (position == 'X' || position == 'O') {
         printf("Position already taken by %c.\n\n", position);
       }
       else {
         // Update row count.
-        switch (row) {
-          case 0:
-            (player_name == PLAYER_1) ? (ptr_rcd->row0)++ : (ptr_rcd->row0)--;
-            break;
-          case 1:
-            (player_name == PLAYER_1) ? (ptr_rcd->row1)++ : (ptr_rcd->row1)--;
-            break;
-          case 2:
-            (player_name == PLAYER_1) ? (ptr_rcd->row2)++ : (ptr_rcd->row2)--;
-            break;
-        }
+        ptr_rcd->row[row_i] += delta;
+        // PLAYER_1: increment row count.
+
         // Update column count.
-        switch (col) {
-          case 0:
-            (player_name == PLAYER_1) ? (ptr_rcd->col0)++ : (ptr_rcd->col0)--;
-            break;
-          case 1:
-            (player_name == PLAYER_1) ? (ptr_rcd->col1)++ : (ptr_rcd->col1)--;
-            break;
-          case 2:
-            (player_name == PLAYER_1) ? (ptr_rcd->col2)++ : (ptr_rcd->col2)--;
-            break;
-        }
+        (ptr_rcd->col[col_j]) += delta;
+
         // Update diagonal count(s). (Middle position, 5, updates both diags.)
-        if (row == col) {
-          if (player_name==PLAYER_1) {
-            (ptr_rcd->diagDownRight)++;
-          } else {
-            (ptr_rcd->diagDownRight)--;
-          }
-          if (row == 1) { // Middle position in both diagonals.
-            if (player_name == PLAYER_1) {
-              (ptr_rcd->diagUpRight)++;
-            } else {
-              (ptr_rcd->diagUpRight)--;
-            }
+        if (row_i == col_j) {
+          (ptr_rcd->diag_down_right) += delta;
+          if (row_i == 1) { // Middle position in both diagonals.
+            (ptr_rcd->diag_up_right) += delta;
           }
         }
-        if (abs(row - col) == 2) {
-          if (player_name == PLAYER_1) {
-            (ptr_rcd->diagUpRight)++;
-          } else {
-            (ptr_rcd->diagUpRight)--;
-          }        
+        if (abs(row_i - col_j) == 2) {
+          (ptr_rcd->diag_up_right) += delta;
         }
-        board[row][col] = (player_name == PLAYER_1) ? 'X' : 'O';
+        board[row_i][col_j] = (strcmp(player_name, PLAYER_1) == 0) ? 'X' : 'O';
         printBoard(board, ROWS);
         break;
     }
@@ -287,23 +260,15 @@ int updateBoard(char player_name[9], char board[][COLS], ThreesCount *ptr_rcd) {
 
 // Reset board array, board display, row/col/diag count, and turn count
 void reset(char board[][COLS], int row_size, int *turn_count, ThreesCount *ptr_rcd) {
-  resetBoard(board, row_size); // Reset board display.
+  resetBoard(board, row_size); // Reset board array.
   resetThreesCount(ptr_rcd); // Reset row/col/diag count.
-  turn_count = 0;  // Reset turn count.
-  // Reset board array.
-  for (int i = 0; i < row_size; i++) {
-    int row = (i - 1) / 3;
-    int col = ( - 1) % 3;
-    char current_digit = (char)(i + '1'); 
-    board[row][col] = current_digit;
-    current_digit = (char)(current_digit + 1); // Next digit.
-  }
+  *turn_count = 0;  // Reset turn count.
 }
 
 int main(void) {
   char board[ROWS][COLS] = {{'1','2','3'},{'4','5','6'},{'7','8','9'}};
   printInstructions();
-  ThreesCount rcd_count = {0, 0, 0, 0, 0, 0, 0, 0}; // rcd = row_col_diag
+  ThreesCount rcd_count = {{0, 0, 0}, {0, 0, 0}, 0, 0}; // rcd = row_col_diag
   ThreesCount *ptr_rcd = &rcd_count;
   printBoard(board, ROWS);
   int keep_playing = KEEP_PLAYING;
